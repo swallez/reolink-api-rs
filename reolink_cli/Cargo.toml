@@ -1,0 +1,16 @@
+[package]
+name = "reolink_cli"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/swallez/reolink-api-rs"
+homepage = "https://github.com/swallez/reolink-api-rs"
+license = "Apache-2.0"
+keywords = ["camera", "reolink"]
+categories = ["api-bindings", "hardware-support"]
+
+
+[dependencies]
+reolink_api = { path = "../reolink_api" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+dotenv = { version = "0.15" }

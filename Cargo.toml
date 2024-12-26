@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["reolink_api", "reolink_cli"]
