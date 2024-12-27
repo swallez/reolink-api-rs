@@ -1,9 +1,11 @@
 [package]
 name = "reolink_api"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Client library for the Reolink cameras and NVR APIs."
+repository = "https://github.com/swallez/reolink-api-rs"
+homepage = "https://github.com/swallez/reolink-api-rs"
 readme = "../README.md"
 
 [dependencies]
