@@ -17,24 +17,25 @@ fn test_login() -> anyhow::Result<()> {
     use crate::api::security::login::*;
     let api = get_client()?;
 
-    let txt = api.exec(&LoginRequest::new(
+    let resp = api.exec(&LoginRequest::new(
         &std::env::var("REOLINK_LOGIN")?,
         &std::env::var("REOLINK_PASSWORD")?,
     ))?;
 
-    print!("{:?}", txt);
+    print!("{:?}", resp);
     Ok(())
 }
 
 #[test]
 fn test_logout() -> anyhow::Result<()> {
     use crate::api::security::logout::*;
-    let mut api = get_client()?;
-    api.use_token()?;
+    let api = get_client()?;
+    // Make sure we have a token
+    api.login()?;
 
-    let txt = api.exec(&LogoutRequest{})?;
+    let resp = api.exec(&LogoutRequest{})?;
 
-    print!("{:?}", txt);
+    print!("{:?}", resp);
     Ok(())
 }
 
@@ -120,8 +121,7 @@ fn test_search() -> anyhow::Result<()> {
 #[test]
 fn test_get_ability() -> anyhow::Result<()> {
     use crate::api::system::get_ability::*;
-    let mut api = get_client()?;
-    api.use_token()?;
+    let api = get_client()?;
 
     let resp = api.exec(&GetAbilityRequest {
         user: GetAbility {
@@ -150,8 +150,7 @@ fn test_get_channel_status() -> anyhow::Result<()> {
 #[test]
 fn test_download() -> anyhow::Result<()> {
     use crate::api::record::download::*;
-    let mut api = get_client()?;
-    api.use_token()?;
+    let api = get_client()?;
 
     // Pick a file from the result of `search`
     let source = "some-file.mp4";

@@ -40,8 +40,6 @@ fn main() -> anyhow::Result<()> {
 
         Commands::Download { file } => {
             let mut client = get_client()?;
-            client.use_token()?;
-
             let bytes = client.download(&DownloadRequest {
                 source: file,
                 output: None,

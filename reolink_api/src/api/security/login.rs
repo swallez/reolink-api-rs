@@ -5,7 +5,9 @@ use crate::api::AuthenticationType;
 
 impl JsonEndpoint for LoginRequest<'_> {
     const CMD: &'static str = "Login";
-    const AUTH: crate::api::AuthenticationType = AuthenticationType::None;
+    // Do NOT send login & password in the URL, even if they're the same as in the payload:
+    // the request will succeed, but the resulting token will be invalid (tested on Home Hub).
+    const AUTH: AuthenticationType = AuthenticationType::None;
     type Response = LoginResult;
     type Initial = NotApplicable;
     type Range = NotApplicable;

@@ -1,3 +1,5 @@
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 use bytes::Bytes;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::{DeserializeOwned, Error};
@@ -7,11 +9,47 @@ use crate::api::{AuthenticationType, BinaryEndpoint, JsonEndpoint};
 
 mod url;
 
-pub enum Credentials {
-    LoginPass { login: String, password: String },
-    Token { token: String },
+pub struct Credentials {
+    pub login: String,
+    pub password: String,
+    pub token: RwLock<Option<Token>>,
 }
 
+impl Credentials {
+    pub fn new(login: String, password: String) -> Self {
+        Credentials { login, password, token: RwLock::new(None) }
+    }
+}
+
+#[derive(Clone)]
+pub struct Token {
+    pub value: String,
+    pub expires: Instant,
+}
+
+impl Token {
+    pub fn new(value: String, lease_time: Duration) -> Self {
+        Self {
+            value,
+            expires: Instant::now() + lease_time,
+        }
+    }
+
+    /// Returns true if this token is expired or about to expire with a grace period.
+    pub fn needs_refresh(&self) -> bool {
+        // Lease duration is normally 1 hour, remove a 30 secs margin
+        self.expires - Duration::from_secs(30) < Instant::now()
+    }
+
+    /// Returns true if this token is expired
+    pub fn is_expired(&self) -> bool {
+        self.expires < Instant::now()
+    }
+}
+
+/// The base operations that this library expects from an http client. It is modelled after
+/// `reqwest`'s client, which provides different (but somewhat similar) types for its
+/// blocking and async clients.
 pub trait HttpClient {
     type Builder: ReqBuilder<Request = Self::Request, Error = Self::Error>;
     type Request: Req;
@@ -20,6 +58,9 @@ pub trait HttpClient {
     // Note: no 'fn execute()' here as it can be blocking or async
 }
 
+/// The base operations that this request expects from an http client. It is modelled after
+/// `reqwest`'s request builder, which provides different (but somewhat similar) types for its
+/// blocking and async clients.
 pub trait ReqBuilder {
     type Request: Req;
     type Error: std::error::Error + Send + Sync + 'static;
@@ -28,26 +69,47 @@ pub trait ReqBuilder {
     fn build(self) -> Result<Self::Request, Self::Error>;
 }
 
+/// An http request. We need mutable access to the url to tweak the query string encoding.
 pub trait Req {
     fn url_mut(&mut self) -> &mut reqwest::Url;
 }
 
 // Section independent of the request type (limit code bloat)
-fn prepare_request_base<HC:HttpClient>(
+fn prepare_request<HC:HttpClient>(
     client: &HC, url: reqwest::Url, cmd: &str, auth: AuthenticationType, creds: &Credentials
 ) -> anyhow::Result<HC::Builder> {
     let mut req = HC::new(client, reqwest::Method::POST, url);
     req = req.query(&[("cmd", cmd)]);
-    if auth != AuthenticationType::None {
-        match creds {
-            Credentials::Token { token } => {
-                req = req.query(&[("token", token)]);
+    match auth {
+        AuthenticationType::None => (),
+
+        AuthenticationType::LoginPassword => {
+            req = req.query(&[("user", &creds.login), ("password", &creds.password)]);
+        },
+
+        AuthenticationType::Any => {
+            // Prefer token if available and not expired
+            match creds.token.read().unwrap().as_ref() {
+                Some(token) if !token.needs_refresh() => {
+                    req = req.query(&[("token", &token.value)]);
+                },
+                _ => {
+                    req = req.query(&[("user", &creds.login), ("password", &creds.password)]);
+                }
             }
-            Credentials::LoginPass { .. } if auth == AuthenticationType::Token => {
-                return Err(anyhow::anyhow!("A token is required for the '{}' API", cmd))
-            }
-            Credentials::LoginPass { login, password } => {
-                req = req.query(&[("user", login), ("password", password)]);
+        },
+
+        AuthenticationType::Token => {
+            match creds.token.read().unwrap().as_ref() {
+                Some(token) if !token.needs_refresh() => {
+                    req = req.query(&[("token", &token.value)]);
+                },
+                Some(_) => {
+                    return Err(anyhow::anyhow!("Token has expired but is required for the '{}' API", cmd))
+                }
+                None => {
+                    return Err(anyhow::anyhow!("A token is required for the '{}' API", cmd))
+                }
             }
         }
     }
@@ -62,11 +124,13 @@ fn finalize_request<RB: ReqBuilder>(builder: RB) -> Result<RB::Request, RB::Erro
     Ok(req)
 }
 
-pub (crate) fn prepare_json_request<HC: HttpClient, APIReq: JsonEndpoint>(
+/// Prepare a request for an endpoint that returns JSON data. If an auth token is needed,
+/// it must be available in `creds`. This function does no token creation or refresh.
+pub fn prepare_json_request<HC: HttpClient, APIReq: JsonEndpoint>(
     client: &HC, url: &reqwest::Url, api_req: &APIReq, creds: &Credentials, details: bool
 ) -> anyhow::Result<HC::Request> {
 
-    let rb = prepare_request_base(client, url.clone(), APIReq::CMD, APIReq::AUTH, creds)?;
+    let rb = prepare_request(client, url.clone(), APIReq::CMD, APIReq::AUTH, creds)?;
 
     // Requests are a single object in an array.
     let body = [ApiRequestEnvelope {
@@ -81,8 +145,12 @@ pub (crate) fn prepare_json_request<HC: HttpClient, APIReq: JsonEndpoint>(
     Ok(finalize_request(rb)?)
 }
 
-pub fn prepare_download_request<HC: HttpClient, Req: BinaryEndpoint>(client: &HC, url: &reqwest::Url, req: &Req, creds: &Credentials) -> anyhow::Result<HC::Request> {
-    let rb = prepare_request_base(client, url.clone(), Req::CMD, Req::AUTH, creds)?;
+/// Prepare a request for an endpoint that returns binary data. If an auth token is needed,
+/// it must be available in `creds`. This function does no token creation or refresh.
+pub fn prepare_download_request<HC: HttpClient, Req: BinaryEndpoint>(
+    client: &HC, url: &reqwest::Url, req: &Req, creds: &Credentials
+) -> anyhow::Result<HC::Request> {
+    let rb = prepare_request(client, url.clone(), Req::CMD, Req::AUTH, creds)?;
     let rb = rb.query(req);
     Ok(finalize_request(rb)?)
 }
@@ -144,8 +212,10 @@ impl <'de, T: DeserializeOwned> Deserialize<'de> for ApiResponse<T> {
         // We could use serde's efficient Content API, but it's private. So use serde-json::Value
         // https://github.com/serde-rs/serde/issues/741
 
-        // Non-monomorphized section
-        fn get_code<'de0, D0: Deserializer<'de0>>(json: &mut JsonValue) -> Result<i64, D0::Error> {
+        // Section independent of the response type (reduce monomorphization)
+        fn get_code_and_json<'de0, D0: Deserializer<'de0>>(deserializer: D0) -> Result<(i64, JsonValue), D0::Error> {
+            let mut json = JsonValue::deserialize(deserializer)?;
+
             let Some(obj) = json.as_object_mut() else {
                 return Err(Error::custom("Expecting an object"));
             };
@@ -164,11 +234,10 @@ impl <'de, T: DeserializeOwned> Deserialize<'de> for ApiResponse<T> {
                 obj.remove("code");
             }
 
-            Ok(code)
+            Ok((code, json))
         }
 
-        let mut json = JsonValue::deserialize(deserializer)?;
-        let code = get_code::<D>(&mut json)?;
+        let (code, json) = get_code_and_json(deserializer)?;
         if code == 0 {
             let result = T::deserialize(json).map_err(Error::custom)?;
             Ok(ApiResponse::Success(result))

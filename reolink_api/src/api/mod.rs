@@ -21,7 +21,7 @@ pub trait JsonEndpoint : Serialize + Debug {
     /// Name of this endpoint
     const CMD: &'static str;
     /// Type of authentication this endpoint expects
-    const AUTH: AuthenticationType = AuthenticationType::LoginPassword;
+    const AUTH: AuthenticationType = AuthenticationType::Any;
     /// Main response value
     type Response: DeserializeOwned;
     /// Response's `initial` value when details are requested
@@ -33,7 +33,7 @@ pub trait JsonEndpoint : Serialize + Debug {
 /// A request for an API endpoint returning binary data
 pub trait BinaryEndpoint : Serialize + Debug {
     const CMD: &'static str;
-    const AUTH: AuthenticationType = AuthenticationType::LoginPassword;
+    const AUTH: AuthenticationType = AuthenticationType::Any;
 }
 
 /// The authentication type an endpoint expects
@@ -41,10 +41,12 @@ pub trait BinaryEndpoint : Serialize + Debug {
 pub enum AuthenticationType {
     /// No authentication
     None,
-    /// Both login/password and token are accepted
+    /// login/password required (e.g. login)
     LoginPassword,
     /// Use of a token is required
     Token,
+    /// Auth required, login/password and token are accepted
+    Any,
 }
 
 /// Data returned by the server when it failed to execute the request

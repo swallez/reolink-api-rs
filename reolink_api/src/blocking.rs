@@ -1,18 +1,37 @@
+use std::fmt::Debug;
+use std::ops::Deref;
+use std::sync::Arc;
+use std::time::Duration;
 use reqwest::{Method, Url};
 use bytes::Bytes;
 use serde::Serialize;
-use crate::api::{BinaryEndpoint, JsonEndpoint};
+use tracing::info;
+use crate::api::{AuthenticationType, BinaryEndpoint, JsonEndpoint};
 use crate::api::security::login::LoginRequest;
 use crate::api::security::logout::LogoutRequest;
 use crate::common;
-use crate::common::Credentials;
+use crate::common::{Credentials, Token};
 
 /// A blocking client for the Reolink API.
+///
+/// Can be cloned cheaply and sent across threads.
+#[derive(Clone)]
 pub struct ReolinkClient {
+    inner: Arc<InnerClient>,
+}
+
+impl Debug for ReolinkClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReolinkClient")
+            .field("url", &self.inner.url)
+            .field("login", &self.inner.credentials.login)
+            .finish()
+    }
+}
+
+struct InnerClient {
     client: reqwest::blocking::Client,
     url: Url,
-    login: String,
-    password: String,
     credentials: Credentials,
 }
 
@@ -26,32 +45,89 @@ impl ReolinkClient {
         url.path_segments_mut().unwrap().extend(&["cgi-bin", "api.cgi"]);
 
         Ok(ReolinkClient {
-            client: reqwest::blocking::Client::new(),
-            url,
-            login: login.clone(),
-            password: password.clone(),
-            credentials: Credentials::LoginPass { login, password },
+            inner: Arc::new(InnerClient {
+                client: reqwest::blocking::Client::new(),
+                url,
+                credentials: Credentials::new(login, password),
+            })
         })
     }
 
-    pub fn use_token(&mut self) -> anyhow::Result<()> {
-        match &self.credentials {
-            Credentials::LoginPass { .. } => {
-                let resp = self.exec(&LoginRequest::new(&self.login, &self.password))?;
-                self.credentials = Credentials::Token { token: resp.token.name };
-            },
-            Credentials::Token { .. } => {},
+    /// Authenticate and make sure this client has a valid token.
+    pub fn login(&self) -> anyhow::Result<()> {
+        self.inner.login()
+    }
+
+    /// Release the current authentication token, if any.
+    pub fn logout(&self) -> anyhow::Result<()> {
+        self.inner.logout()
+    }
+
+    pub fn exec<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<Req::Response> {
+        self.inner.exec::<Req>(req)
+    }
+
+    pub fn exec_with_details<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<(Req::Response, Req::Initial, Req::Range)> {
+        self.inner.exec_with_details::<Req>(req)
+    }
+
+    pub fn download<Req: BinaryEndpoint>(&self, req: &Req) -> anyhow::Result<Bytes> {
+        self.inner.download::<Req>(req)
+    }
+}
+
+impl InnerClient {
+    fn logout(&self) -> anyhow::Result<()> {
+        let creds = &self.credentials;
+        let token = creds.token.read().unwrap();
+
+        match token.deref() {
+            Some(t) if !t.is_expired() => {
+                drop(token);
+                let result = self.exec(&LogoutRequest{});
+                // Clear token
+                *creds.token.write().unwrap() = None;
+                result?;
+            }
+            _ => ()
         }
 
         Ok(())
     }
 
-    pub fn logout(self) -> anyhow::Result<()> {
-        self.exec(&LogoutRequest{})?;
-        Ok(())
+    /// Ensures this client has a valid token.
+    fn login(&self) -> anyhow::Result<()> {
+        let creds = &self.credentials;
+        let token = creds.token.read().unwrap();
+        match token.deref() {
+            Some(t) if !t.needs_refresh() => {
+                Ok(())
+            },
+            _ => {
+                drop(token); // Release read lock
+                let mut token = creds.token.write().unwrap();
+                // Got the write lock: recheck
+                if token.as_ref().map(|t| t.needs_refresh()).unwrap_or(true) {
+                    // No risk of deadlock as this endpoint is Auth::LoginPassword,
+                    // so we won't call this function when using it.
+                    let resp = self.exec(&LoginRequest::new(&creds.login, &creds.password))?;
+                    *token = Some(Token::new(resp.token.name, Duration::from_secs(resp.token.lease_time as u64)));
+                }
+                Ok(())
+            }
+        }
     }
 
-    pub fn exec<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<Req::Response> {
+    fn ensure_token_if_needed(&self, auth: AuthenticationType) -> anyhow::Result<()> {
+        if auth == AuthenticationType::Token {
+            self.login()
+        } else {
+            Ok(())
+        }
+    }
+
+    fn exec<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<Req::Response> {
+        self.ensure_token_if_needed(Req::AUTH)?;
         let request = common::prepare_json_request(&self.client, &self.url, req, &self.credentials, false)?;
 
         let response = self.client.execute(request)?
@@ -60,7 +136,8 @@ impl ReolinkClient {
         common::parse_json_response::<Req>(&response)
     }
 
-    pub fn exec_with_details<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<(Req::Response, Req::Initial, Req::Range)> {
+    fn exec_with_details<Req: JsonEndpoint>(&self, req: &Req) -> anyhow::Result<(Req::Response, Req::Initial, Req::Range)> {
+        self.ensure_token_if_needed(Req::AUTH)?;
         let request = common::prepare_json_request(&self.client, &self.url, req, &self.credentials, true)?;
 
         let response = self.client.execute(request)?
@@ -69,10 +146,17 @@ impl ReolinkClient {
         common::parse_json_detailed_response::<Req>(&response)
     }
 
-    pub fn download<Req: BinaryEndpoint>(&self, req: &Req) -> anyhow::Result<Bytes> {
+    fn download<Req: BinaryEndpoint>(&self, req: &Req) -> anyhow::Result<Bytes> {
+        self.ensure_token_if_needed(Req::AUTH)?;
         let req = common::prepare_download_request(&self.client, &self.url, req, &self.credentials)?;
         let resp = self.client.execute(req)?;
         Ok(resp.bytes()?)
+    }
+}
+
+impl Drop for InnerClient {
+    fn drop(&mut self) {
+        self.logout().unwrap_or_else(|err| info!("Logout failed: {:?}", err));
     }
 }
 
