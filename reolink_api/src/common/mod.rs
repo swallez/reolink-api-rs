@@ -1,6 +1,7 @@
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use bytes::Bytes;
+use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde::de::{DeserializeOwned, Error};
 use crate::api::ApiError;
@@ -51,10 +52,10 @@ impl Token {
 /// `reqwest`'s client, which provides different (but somewhat similar) types for its
 /// blocking and async clients.
 pub trait HttpClient {
-    type Builder: ReqBuilder<Request = Self::Request, Error = Self::Error>;
+    type RequestBuilder: ReqBuilder<Request = Self::Request, Error = Self::Error>;
     type Request: Req;
     type Error: std::error::Error + Send + Sync + 'static;
-    fn new(client: &Self, method: reqwest::Method, url: reqwest::Url) -> Self::Builder;
+    fn request(client: &Self, method: reqwest::Method, url: reqwest::Url) -> Self::RequestBuilder;
     // Note: no 'fn execute()' here as it can be blocking or async
 }
 
@@ -65,6 +66,7 @@ pub trait ReqBuilder {
     type Request: Req;
     type Error: std::error::Error + Send + Sync + 'static;
     fn query<T: Serialize + ?Sized>(self, query: &T) -> Self;
+    fn timeout(self, timeout: Duration) -> Self;
     fn json<T: Serialize + ?Sized>(self, json: &T) -> Self;
     fn build(self) -> Result<Self::Request, Self::Error>;
 }
@@ -74,11 +76,21 @@ pub trait Req {
     fn url_mut(&mut self) -> &mut reqwest::Url;
 }
 
+pub fn get_api_url(mut url: &str) -> anyhow::Result<Url> {
+    if url.ends_with("/") {
+        url = &url[..url.len() - 1];
+    }
+
+    let mut url = Url::parse(url)?;
+    url.path_segments_mut().unwrap().extend(&["cgi-bin", "api.cgi"]);
+    Ok(url)
+}
+
 // Section independent of the request type (limit code bloat)
 fn prepare_request<HC:HttpClient>(
     client: &HC, url: reqwest::Url, cmd: &str, auth: AuthenticationType, creds: &Credentials
-) -> anyhow::Result<HC::Builder> {
-    let mut req = HC::new(client, reqwest::Method::POST, url);
+) -> anyhow::Result<HC::RequestBuilder> {
+    let mut req = HC::request(client, reqwest::Method::POST, url);
     req = req.query(&[("cmd", cmd)]);
     match auth {
         AuthenticationType::None => (),
@@ -151,6 +163,7 @@ pub fn prepare_download_request<HC: HttpClient, Req: BinaryEndpoint>(
     client: &HC, url: &reqwest::Url, req: &Req, creds: &Credentials
 ) -> anyhow::Result<HC::Request> {
     let rb = prepare_request(client, url.clone(), Req::CMD, Req::AUTH, creds)?;
+    let rb = rb.timeout(Duration::from_secs(5*60));
     let rb = rb.query(req);
     Ok(finalize_request(rb)?)
 }

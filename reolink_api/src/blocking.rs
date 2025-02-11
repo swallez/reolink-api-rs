@@ -36,18 +36,20 @@ struct InnerClient {
 }
 
 impl ReolinkClient {
-    pub fn new(mut url: &str, login: String, password: String) -> anyhow::Result<Self> {
-        if url.ends_with("/") {
-            url = &url[..url.len() - 1];
-        }
+    pub fn new(url: &str, login: String, password: String) -> anyhow::Result<Self> {
+        let client = reqwest::blocking::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        Self::new_with_client(client, url, login, password)
+    }
 
-        let mut url = Url::parse(url)?;
-        url.path_segments_mut().unwrap().extend(&["cgi-bin", "api.cgi"]);
-
+    pub fn new_with_client(
+        client: reqwest::blocking::Client, url: &str, login: String, password: String
+    ) -> anyhow::Result<Self> {
         Ok(ReolinkClient {
             inner: Arc::new(InnerClient {
-                client: reqwest::blocking::Client::new(),
-                url,
+                client,
+                url: common::get_api_url(url)?,
                 credentials: Credentials::new(login, password),
             })
         })
@@ -167,11 +169,11 @@ impl common::Req for reqwest::blocking::Request {
 }
 
 impl common::HttpClient for reqwest::blocking::Client {
-    type Builder = reqwest::blocking::RequestBuilder;
+    type RequestBuilder = reqwest::blocking::RequestBuilder;
     type Request = reqwest::blocking::Request;
     type Error = reqwest::Error;
 
-    fn new(client: &Self, method: Method, url: Url) -> Self::Builder {
+    fn request(client: &Self, method: Method, url: Url) -> Self::RequestBuilder {
         client.request(method, url)
     }
 }
@@ -182,6 +184,10 @@ impl common::ReqBuilder for reqwest::blocking::RequestBuilder {
 
     fn query<T: Serialize + ?Sized>(self, query: &T) -> Self {
         self.query(query)
+    }
+
+    fn timeout(self, timeout: Duration) -> Self {
+        self.timeout(timeout)
     }
 
     fn json<T: Serialize + ?Sized>(self, json: &T) -> Self {
