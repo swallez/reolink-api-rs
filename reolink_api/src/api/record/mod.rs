@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+pub mod download;
 pub mod get_recording;
 pub mod get_recording_v20;
+pub mod nvr_download;
 pub mod search;
-pub mod download;
 pub mod snapshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

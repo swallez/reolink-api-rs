@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, BoolFromInt};
 use crate::api::NotApplicable;
 use crate::api::JsonEndpoint;
 
@@ -20,11 +21,13 @@ pub struct GetChannelStatusResponse {
     pub status: Vec<ChannelStatus>,
 }
 
+#[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelStatus {
     pub channel: usize,
     pub name: String,
-    pub online: usize,
+    #[serde_as(as = "BoolFromInt")]
+    pub online: bool,
     // Not present on Home Hub
     #[serde(rename = "typeInfo")]
     pub type_info: Option<String>,
@@ -32,6 +35,7 @@ pub struct ChannelStatus {
     #[serde(default)]
     pub uid: String,
     // Not in the spec, but present in Home Hub
+    #[serde_as(as = "BoolFromInt")]
     #[serde(default)]
-    pub sleep: usize,
+    pub sleep: bool,
 }

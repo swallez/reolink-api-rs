@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::{ serde_as, DisplayFromStr };
 use crate::api::NotApplicable;
 use crate::api::JsonEndpoint;
 use crate::api::record::Time;
@@ -59,6 +60,7 @@ pub struct SearchStatus {
     pub table: String,
 }
 
+#[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchFile {
     #[serde(rename = "type")]
@@ -71,6 +73,7 @@ pub struct SearchFile {
     pub frame_rate: usize,
     pub height: usize,
     pub width: usize,
-    pub size: String, // actually a number
+    #[serde_as(as = "DisplayFromStr")]
+    pub size: usize,
     pub name: String,
 }

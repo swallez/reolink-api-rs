@@ -10,9 +10,9 @@ Rust client for the Reolink API. It is based on [the CGI/API version 8 (2023-4)]
 ## Todo
 
 - [ ] Async client
-- [ ] Automatically get a token for APIs that require it (e.g. `download`)
-- [ ] Automatic token renewal
-- [ ] Automatic logout when the client is dropped, to avoid token starvation (each device accepts a limited number of live tokens)
+- [x] Automatically get a token for APIs that require it (e.g. `download`)
+- [x] Automatic token renewal
+- [x] Automatic logout when the client is dropped, to avoid token starvation (each device accepts a limited number of live tokens)
 - [ ] Library-specific types/enums where applicable
 - [ ] A download API that gives access to headers (e.g. byte-range request header, response content-type)
 
@@ -22,7 +22,7 @@ See the [Camera HTTP API Version 8 - 2023-4](docs/Camera_HTTP_API_User_Guide_v8-
 
 System:
 - [x] GetAbility
-- [ ] GetDevInfo
+- [x] GetDevInfo
 - [ ] GetDevName
 - [ ] SetDevName
 - [ ] GetTime
@@ -119,7 +119,7 @@ Record:
 - [x] Download
 - [x] Snap
 - [ ] Playback
-- [ ] NvrDownload
+- [x] NvrDownload
 
 PTZ:
 - [ ] GetPtzPreset

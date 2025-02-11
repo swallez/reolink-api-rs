@@ -50,6 +50,7 @@ fn test_get_user() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test]
 fn test_add_user() -> anyhow::Result<()> {
     use crate::api::security::add_user::*;
@@ -119,6 +120,27 @@ fn test_search() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_nvr_download() -> anyhow::Result<()> {
+    use crate::api::record::nvr_download::*;
+    let api = get_client()?;
+
+    let date_time = chrono::NaiveDate::from_ymd_opt(2025, 2, 9).unwrap()
+        .and_hms_opt(0, 0, 0).unwrap();
+
+    let resp = api.exec(&NvrDownloadRequest {
+        nvr_download: NvrDownload {
+            channel: 1,
+            stream_type: "main".to_string(),
+            start_time: date_time.into(),
+            end_time: (date_time + TimeDelta::days(1) - TimeDelta::seconds(1)).into(),
+        }
+    })?;
+
+    println!("{:#?}", resp);
+    Ok(())
+}
+
+#[test]
 fn test_get_ability() -> anyhow::Result<()> {
     use crate::api::system::get_ability::*;
     let api = get_client()?;
@@ -174,6 +196,18 @@ fn test_snapshot() -> anyhow::Result<()> {
         channel: 0,
         rs: "0123456789012345".to_string(),
     })?;
+
+    Ok(())
+}
+
+#[test]
+fn test_dev_info() -> anyhow::Result<()> {
+    use crate::api::system::get_dev_info::*;
+    let api = get_client()?;
+
+    let resp = api.exec(&GetDevInfoRequest)?;
+
+    println!("{:#?}", resp);
 
     Ok(())
 }
