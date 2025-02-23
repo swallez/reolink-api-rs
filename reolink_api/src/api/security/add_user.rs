@@ -9,6 +9,7 @@ impl JsonEndpoint for AddUserRequest {
     type Range = NotApplicable;
 }
 
+/// Used to set the configuration of a user.
 #[derive(Debug, Clone, Serialize)]
 pub struct AddUserRequest {
     #[serde(rename = "User")]
@@ -17,9 +18,12 @@ pub struct AddUserRequest {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AddUser {
+    /// User name
     #[serde(rename = "userName")]
     pub username: String,
+    /// Password
     pub password: String,
+    /// Access level (`admin` or `guest`)
     pub level: String,
 }
 

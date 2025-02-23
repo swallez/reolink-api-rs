@@ -10,6 +10,7 @@ impl JsonEndpoint for LogoutRequest {
     type Range = NotApplicable;
 }
 
+/// Release a token.
 // Note: this has to be an empty object
 #[derive(Debug, Clone, Serialize)]
 pub struct LogoutRequest {}

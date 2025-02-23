@@ -10,6 +10,7 @@ pub use chrono;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
+mod serde;
 
 #[cfg(feature = "blocking")]
 /// A blocking client for the Reolink API.

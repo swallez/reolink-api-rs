@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, BoolFromInt};
-use crate::api::NotApplicable;
+use crate::api::{Channel, NotApplicable};
 use crate::api::JsonEndpoint;
 
 impl JsonEndpoint for GetChannelStatusRequest {
@@ -10,6 +9,7 @@ impl JsonEndpoint for GetChannelStatusRequest {
     type Range = NotApplicable;
 }
 
+/// Get the status of all channels.
 #[derive(Debug, Clone, Serialize)]
 pub struct GetChannelStatusRequest;
 
@@ -21,21 +21,26 @@ pub struct GetChannelStatusResponse {
     pub status: Vec<ChannelStatus>,
 }
 
-#[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelStatus {
-    pub channel: usize,
+    pub channel: Channel,
     pub name: String,
-    #[serde_as(as = "BoolFromInt")]
+
+    /// Is this channel online?
+    #[serde(with = "crate::serde::bool_as_number")]
     pub online: bool,
+
     // Not present on Home Hub
     #[serde(rename = "typeInfo")]
     pub type_info: Option<String>,
+
+    /// Unique id of the device when the channel is a device on a hub
     // Not in the spec, but present in Home Hub
     #[serde(default)]
-    pub uid: String,
+    pub uid: Option<String>,
+
+    /// Is this channel sleeping? Used when a channel represents a battery-powered camera.
     // Not in the spec, but present in Home Hub
-    #[serde_as(as = "BoolFromInt")]
-    #[serde(default)]
+    #[serde(default, with = "crate::serde::bool_as_number")]
     pub sleep: bool,
 }

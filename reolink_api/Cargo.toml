@@ -11,7 +11,6 @@ readme = "../README.md"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-serde_with = "3"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 anyhow = "1"
 bytes = "1"

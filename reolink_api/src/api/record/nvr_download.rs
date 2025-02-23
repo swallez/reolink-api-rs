@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use crate::api::{JsonEndpoint, NotApplicable};
-use crate::api::record::Time;
+use crate::api::{Channel, JsonEndpoint, NotApplicable};
+use crate::api::record::DateTime;
 
 impl JsonEndpoint for NvrDownloadRequest {
     const CMD: &'static str = "NvrDownload";
@@ -18,14 +17,14 @@ pub struct NvrDownloadRequest {
 
 #[derive(Debug, Serialize)]
 pub struct NvrDownload {
-    pub channel: usize,
+    pub channel: Channel,
     /// The bitstream type of the file to download, `"main"` or `"sub"`.
     #[serde(rename = "streamType")]
     pub stream_type: String,
     #[serde(rename = "StartTime")]
-    pub start_time: Time,
+    pub start_time: DateTime,
     #[serde(rename = "EndTime")]
-    pub end_time: Time,
+    pub end_time: DateTime,
 }
 
 //----- Result
@@ -38,12 +37,10 @@ pub struct NvrDownloadResponse {
     pub file_list: Vec<NvrFile>,
 }
 
-#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct NvrFile {
     #[serde(rename = "fileName")]
     pub name: String,
-    #[serde_as(as = "DisplayFromStr")]
-    #[serde(rename = "fileSize")]
+    #[serde(rename = "fileSize",with = "crate::serde::from_str")]
     pub size: u64,
 }

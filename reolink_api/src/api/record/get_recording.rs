@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use crate::api::JsonEndpoint;
+use crate::api::{Channel, JsonEndpoint};
+use crate::api::record::ScheduleTable;
 
 impl JsonEndpoint for GetRecordingRequest {
     const CMD: &'static str = "GetRec";
@@ -8,9 +9,12 @@ impl JsonEndpoint for GetRecordingRequest {
     type Range = GetRecordingRange;
 }
 
+/// Get the recording configuration. Note: This command supports models 52X only. When
+/// `scheduleVersion=1` in the capability set, use `get_recording_v20`.
 #[derive(Debug, Clone, Serialize)]
 pub struct GetRecordingRequest {
-    pub channel: usize,
+    /// Channel number
+    pub channel: Channel,
 }
 
 //----- Result & Initial
@@ -23,21 +27,38 @@ pub struct GetRecordingResponse {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RecordingConfig {
-    pub channel: usize,
-    pub overwrite: usize,
+    /// Channel number
+    pub channel: Channel,
+
+    /// Whether the video files can be overwritten
+    #[serde(with = "crate::serde::bool_as_number")]
+    pub overwrite: bool,
+
+    /// Packaging cycle period as a string, e.g. "30 Minutes".
+    /// Possible values are listed in `RecordingRange`.
     #[serde(rename = "packTime")]
     pub pack_time: String, // NVR
+
+    /// Post record time as a string, e.g. "1 Minute".
+    /// Possible values are listed in `RecordingRange`.
     #[serde(rename = "postRec")]
     pub post_rec: String,
-    #[serde(rename = "preRec")]
-    pub pre_rec: usize,
+
+    /// Enable pre record
+    #[serde(rename = "preRec", with = "crate::serde::bool_as_number")]
+    pub pre_rec: bool,
+
+    /// Weekly scheduling table: 7 days * 24 hours. Each byte indicates whether it’s recording.
+    /// With the value of 0 the recording is off, otherwise the recording is on.
     pub schedule: RecordingSchedule,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RecordingSchedule {
-    pub enable: usize,
-    pub table: String,
+    /// Is this schedule enabled?
+    #[serde(with = "crate::serde::bool_as_number")]
+    pub enable: bool,
+    pub table: ScheduleTable,
 }
 
 //----- Range
@@ -49,20 +70,19 @@ pub struct GetRecordingRange {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RecordingRange {
-    pub channel: usize,
-    pub overwrite: String, // "boolean"
+    pub channel: Channel,
+
+    pub overwrite: String, // Constant string "boolean"
+
     #[serde(rename = "packTime")]
     pub pack_time: Vec<String>, // NVR
+
     #[serde(rename = "postRec")]
     pub post_rec: Vec<String>,
+
     #[serde(rename = "preRec")]
     pub pre_rec: String, // "boolean",
-    #[serde(rename = "schedule")]
-    pub schedule: ScheduleRange,
-}
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ScheduleRange {
-    pub enable: usize,
-    pub table: String,
+    #[serde(rename = "schedule")]
+    pub schedule: ScheduleTable,
 }

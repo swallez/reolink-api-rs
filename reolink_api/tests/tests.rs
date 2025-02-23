@@ -92,7 +92,7 @@ fn test_search() -> anyhow::Result<()> {
     let resp = api.exec(&SearchRequest {
         search: Search {
             channel: 0,
-            only_status: 0,
+            only_status: false,
             stream_type: "main".to_string(),
             start_time: date_time.into(),
             // start_time: Time {
@@ -141,7 +141,7 @@ fn test_nvr_download() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_get_ability() -> anyhow::Result<()> {
+fn  test_get_ability() -> anyhow::Result<()> {
     use crate::api::system::get_ability::*;
     let api = get_client()?;
 

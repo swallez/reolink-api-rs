@@ -70,3 +70,6 @@ pub struct ApiErrorData {
     pub rsp_code: isize,
     pub detail: String,
 }
+
+/// A channel. Reolink NVRs support up to 24 channels.
+pub type Channel = u8;

@@ -11,6 +11,9 @@ categories = ["api-bindings", "hardware-support"]
 
 [dependencies]
 reolink_api = { path = "../reolink_api" }
+bytesize = "1.3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dotenv = { version = "0.15" }
+#trauma = "2"
+reqwest = { version = "*", features = ["native-tls"] }

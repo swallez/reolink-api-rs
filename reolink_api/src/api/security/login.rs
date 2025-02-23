@@ -15,6 +15,7 @@ impl JsonEndpoint for LoginRequest<'_> {
 
 //----- Request
 
+/// Authenticate and get a new access token.
 #[derive(Debug, Clone, Serialize)]
 pub struct LoginRequest<'a> {
     #[serde(rename = "User")]
@@ -35,11 +36,13 @@ impl <'a> LoginRequest<'a> {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LoginUser<'a> {
-    /// Must be `"0"`
+    /// Must be `"0"` (`"1"` is a private encryption protocol that is not documented)
     #[serde(rename = "Version")]
     pub version: &'static str,
+    /// User name
     #[serde(rename = "userName")]
     pub user_name: &'a str,
+    /// Password
     pub password: &'a str,
 }
 
@@ -53,7 +56,9 @@ pub struct LoginResult {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Token {
+    /// Token value. Length should be less than 32 characters.
+    pub name: String,
+    /// Token lease time in seconds
     #[serde(rename="leaseTime")]
     pub lease_time: usize,
-    pub name: String,
 }

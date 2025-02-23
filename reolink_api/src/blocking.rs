@@ -132,7 +132,8 @@ impl InnerClient {
         self.ensure_token_if_needed(Req::AUTH)?;
         let request = common::prepare_json_request(&self.client, &self.url, req, &self.credentials, false)?;
 
-        let response = self.client.execute(request)?
+        let response = self.client
+            .execute(request)?
             .error_for_status()?
             .bytes()?;
         common::parse_json_response::<Req>(&response)
@@ -142,7 +143,8 @@ impl InnerClient {
         self.ensure_token_if_needed(Req::AUTH)?;
         let request = common::prepare_json_request(&self.client, &self.url, req, &self.credentials, true)?;
 
-        let response = self.client.execute(request)?
+        let response = self.client
+            .execute(request)?
             .error_for_status()?
             .bytes()?;
         common::parse_json_detailed_response::<Req>(&response)
@@ -151,7 +153,9 @@ impl InnerClient {
     fn download<Req: BinaryEndpoint>(&self, req: &Req) -> anyhow::Result<Bytes> {
         self.ensure_token_if_needed(Req::AUTH)?;
         let req = common::prepare_download_request(&self.client, &self.url, req, &self.credentials)?;
-        let resp = self.client.execute(req)?;
+        let resp = self.client
+            .execute(req)?
+            .error_for_status()?;
         Ok(resp.bytes()?)
     }
 }

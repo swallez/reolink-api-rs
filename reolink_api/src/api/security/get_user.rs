@@ -10,6 +10,7 @@ impl JsonEndpoint for GetUserRequest {
 
 //----- Request
 
+/// Get information about all users
 #[derive(Debug, Clone, Serialize)]
 pub struct GetUserRequest;
 
@@ -23,9 +24,11 @@ pub struct GetUserResult {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UserInfo {
-    pub level: String,
+    /// User name
     #[serde(rename = "userName")]
     pub user_name: String,
+    /// Access level (`admin` or `guest`)
+    pub level: String,
 }
 
 //----- Initial
@@ -51,10 +54,13 @@ pub struct GetUserRange {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UserRange {
+    /// Available access levels
     pub level: Vec<String>,
-    pub password: LengthRange,
     #[serde(rename = "userName")]
+    /// Min and max length of a username
     pub user_name: LengthRange,
+    /// Min and max length of a password
+    pub password: LengthRange,
 }
 
 #[derive(Debug, Clone, Deserialize)]
