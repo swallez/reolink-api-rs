@@ -11,7 +11,7 @@ readme = "../README.md"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 anyhow = "1"
 bytes = "1"
 chrono = { version = "0.4", optional = true }
@@ -19,8 +19,14 @@ tracing = "0.1"
 
 [features]
 default = ["blocking", "chrono"]
-blocking = []
+# Enables the blocking client
+blocking = ["reqwest/blocking"]
+# Allows `DateTime` values to be converted to/from Chrono's `NaiveDateTime`.
 chrono = ["dep:chrono"]
+# Enables TLS using the native libraries
+native-tls = ["reqwest/native-tls"]
+# Enables TLS using the Rustls crate
+rustls-tls = ["reqwest/rustls-tls"]
 
 [dev-dependencies]
 dotenv = "0.15"

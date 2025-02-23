@@ -8,12 +8,16 @@ license = "Apache-2.0"
 keywords = ["camera", "reolink"]
 categories = ["api-bindings", "hardware-support"]
 
-
 [dependencies]
-reolink_api = { path = "../reolink_api" }
+reolink_api = { path = "../reolink_api", default-features = false, features = ["blocking", "chrono"]}
 bytesize = "1.3"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dotenv = { version = "0.15" }
-#trauma = "2"
-reqwest = { version = "*", features = ["native-tls"] }
+
+[features]
+default = ["native-tls"]
+# Enables TLS using the native libraries
+native-tls = ["reolink_api/native-tls"]
+# Enables TLS using the Rustls crate
+rustls-tls = ["reolink_api/rustls-tls"]

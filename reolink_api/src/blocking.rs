@@ -36,10 +36,18 @@ struct InnerClient {
 }
 
 impl ReolinkClient {
+
+    /// Creates a new client with default settings.
+    ///
+    /// **Warning**: TLS certificate validation is disabled. Even if dangerous, this is often
+    /// acceptable in home network environments.
     pub fn new(url: &str, login: String, password: String) -> anyhow::Result<Self> {
-        let client = reqwest::blocking::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client = reqwest::blocking::Client::builder();
+
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        let client = client.danger_accept_invalid_certs(true);
+
+        let client = client.build()?;
         Self::new_with_client(client, url, login, password)
     }
 
